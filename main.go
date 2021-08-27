@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"crypto/sha1"
+	"crypto/tls"
 	"encoding/csv"
 	"flag"
 	"fmt"
@@ -98,6 +99,9 @@ var createBucket bool
 // the S3 SDK client
 var s3Client *s3.S3
 
+// flag if we want to allow any certificate on the connections, for testing self signed endpoints etc.
+var ignoreCertificates bool
+
 // program entry point
 func main() {
 	// parse the program arguments and set the global variables
@@ -136,6 +140,7 @@ func parseFlags() {
 	cleanupArg := flag.Bool("cleanup", false, "Cleans all the objects uploaded to S3 for this test.")
 	csvResultsArg := flag.String("upload-csv", "", "Uploads the test results to S3 as a CSV file.")
 	createBucketArg := flag.Bool("create-bucket", true, "Create the bucket")
+	ignoreCertificatesArg := flag.Bool("allow-invalid-certs", false, "Do not validate certificates")
 	
 	// parse the arguments and set all the global variables accordingly
 	flag.Parse()
@@ -160,6 +165,7 @@ func parseFlags() {
 	cleanupOnly = *cleanupArg
 	csvResults = *csvResultsArg
 	createBucket = *createBucketArg
+	ignoreCertificates = *ignoreCertificatesArg
 
 	if payloadsMin > payloadsMax {
 		payloadsMin = payloadsMax
@@ -200,6 +206,10 @@ func setupS3Client() {
 	// set the endpoint in the configuration
 	if endpoint != "" {
 		cfg.EndpointResolver = aws.ResolveWithEndpointURL(endpoint)
+	}
+
+	if ignoreCertificates {
+		http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	}
 
 	// set a 3-minute timeout for all S3 calls, including downloading the body
